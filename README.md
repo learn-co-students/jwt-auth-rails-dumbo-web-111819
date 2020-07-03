@@ -121,98 +121,6 @@ class User < ApplicationRecord
 end
 ```
 
----
-
-#### Quick BCrypt Tangent
-
-- Recall that `BCrypt` allows us to [salt](<https://en.wikipedia.org/wiki/Salt_(cryptography)>) users' plaintext passwords before running them through a [hashing function](https://en.wikipedia.org/wiki/Cryptographic_hash_function). A hashing function is, basically, a _one way_ function. Similar to putting something in a meat grinder: we cannot _feasibly_ reconstruct something that's been ground up by a meat grinder. We then store these passwords that have been 'digested' by `BCrypt` in our database. **[Never ever ever store your users' plaintext passwords in your database](https://blog.mozilla.org/webdev/2012/06/08/lets-talk-about-password-storage/). It's bad form and should be avoided at all costs.**
-
-- Let's take a look at some of the functionality provided by `BCrypt`:
-
-```ruby
-# in rails console
-> BCrypt::Password.create('P@ssw0rd')
- => "$2a$10$D0iXNNy/5r2YC5GC4ArGB.dNL6IpUzxH3WjCewb3FM8ciwsHBt0cq"
-```
-
-- `BCrypt::Password` [inherits from the Ruby `String` class](https://github.com/codahale/bcrypt-ruby/blob/master/lib/bcrypt/password.rb#L23) and has its own [== instance method](https://github.com/codahale/bcrypt-ruby/blob/master/lib/bcrypt/password.rb#L65) that allows us to run a plaintext password through `BCrypt` _using the same salt_ and compare it against an already digested password:
-
-```ruby
-# in rails console
-> salted_pw = BCrypt::Password.create('P@ssw0rd')
-  => "$2a$10$YQvJPemUzm8IdCCaHxiOOes6HMEHda/.Hl60cUoYb4X4fncgT8ubG"
-
-> salted_pw.class
-  => BCrypt::Password
-
-> salted_pw == 'P@ssw0rd'
-  => true
-```
-
-- `BCrypt` also provides a method that will take a stringified `password_digest` and turn it into an instance of `BCrypt::Password`, allowing us to call the over-written `==` method.
-
-```ruby
-# in rails console
-> sample_digest = User.last.password_digest
-  => "$2a$10$SJiIJnmQJ/A4z4fFG5EuE.aOoCjacFuQMVpVzQnhPSJKYLFCoqmWy"
-
-> sample_digest.class
-  => String
-
-> sample_digest == 'P@ssword'
- => false
-
-> bcrypt_sample_digest = BCrypt::Password.new(sample_digest)
-  => "$2a$10$dw4sYcbLXc8XRX6YGc7ve.ot6LbYevMbSpFQZUaa8tm5NI8cxBPwa"
-
-> bcrypt_sample_digest.class
-  => BCrypt::Password
-
-> bcrypt_sample_digest == 'P@ssw0rd'
-  => true
-```
-
-![mind blown](https://media.giphy.com/media/26ufdipQqU2lhNA4g/giphy.gif)
-
-- We have no way of storing instances of `BCrypt::Password` in our database. Instead, we're storing users' password digests **[as strings][schema]**. If we were to build our own `User#authenticate` method using `BCrypt`, it might look something like this:
-
-```ruby
-class User < ApplicationRecord
-  attr_accessor :password
-
-  def authenticate(plaintext_password)
-    if BCrypt::Password.new(self.password_digest) == plaintext_password
-      self
-    else
-      false
-    end
-  end
-end
-```
-
-```ruby
-# in rails console
-> User.last.authenticate('not my password')
-  => false
-
-> User.last.authenticate('P@ssw0rd')
-  => #<User id: 21, username: "Guy", password_digest: "$2a$10$dw4sYcbLXc8XRX6YGc7ve.ot6LbYevMbSpFQZUaa8tm...", avatar: nil, created_at: "2018-08-31 02:11:15", updated_at: "2018-08-31 02:11:15", bio: "I love flavortown, USA">
-```
-
-- Instead of creating our own `User#authenticate` method, we can use [`ActiveModel#has_secure_password`](https://api.rubyonrails.org/classes/ActiveModel/SecurePassword/ClassMethods.html#method-i-has_secure_password):
-
-```ruby
-class User < ApplicationRecord
-  has_secure_password
-end
-```
-
-![salt bae](https://media.giphy.com/media/l4Jz3a8jO92crUlWM/giphy.gif)
-
-#### End of BCrypt Tangent
-
----
-
 - Let's add a `create` method to our [`UsersController`][users_controller]:
 
 ```ruby
@@ -286,8 +194,6 @@ fetch('http://localhost:3000/api/v1/users', {
 ---
 
 # Make Sure You Can POST and Create a New User Before Proceeding
-
-![intermission](https://media.giphy.com/media/pcPs6v6fhE7Ru/giphy.gif)
 
 ---
 
@@ -451,8 +357,6 @@ JWT::DecodeError (Invalid segment encoding)
 
 - Instead of crashing our server, we simply return `nil` and keep trucking along.
 
-![keep trucking](https://media.giphy.com/media/3xb5V0fbxHXck/giphy.gif)
-
 ---
 
 - We can then complete our [`ApplicationController`][application_controller] by automatically obtaining the user whenever an authorization header is present:
@@ -585,11 +489,7 @@ end
 
 - It wouldn't make sense to ask our users to be logged in before they create an account. This circular logic will make it **impossible** for users to authenticate into the app. How can a user create an account if our app asks them to be logged in or `authorized` to do so? Skipping the before action 'unlocks' this portion of our app.
 
-![wut](https://media.giphy.com/media/1L5YuA6wpKkNO/giphy.gif)
-
 - Try creating a new user again with either [postman](https://www.getpostman.com/apps) or fetch and confirm that your server successfully issues a token on signup.
-
-![sign me up gif](https://media.giphy.com/media/xUOrw5LIxb8S9X1LGg/giphy.gif)
 
 ---
 
@@ -712,8 +612,6 @@ render json: { message: 'Please log in' }, status: :unauthorized
 ---
 
 ## That's It For the Server!
-
-![i am done gif](https://media.giphy.com/media/lS74OiH1JYYak/giphy.gif)
 
 ---
 
